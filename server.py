@@ -5,7 +5,7 @@ import requests
 app = FastAPI()
 
 STABILITY_API_KEY = "sk-Gyhxq4ipCuDDhCj1EiqVILp7SQ2Tgm1FnCYIbBQSCZnh70gS"
-MCP_SECRET_KEY = "sdxl_secretkey_mj"
+MCP_SECRET_KEY = "sdxl_secret_key_mj13"
 
 class ImageRequest(BaseModel):
     prompt: str
