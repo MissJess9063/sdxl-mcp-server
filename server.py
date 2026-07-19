@@ -8,7 +8,7 @@ app = FastAPI()
 STABILITY_API_KEY = "sk-Gyhxq4ipCuDDhCj1EiqVILp7SQ2Tgm1FnCYIbBQSCZnh70gS"
 MCP_SECRET_KEY = "sdxl_secret_key_mj13"
 
-# ⭐ MCP Initialization Endpoint
+# ⭐ MCP Initialization Endpoint (NO BODY REQUIRED)
 @app.post("/initialize")
 def initialize():
     return {
@@ -42,7 +42,6 @@ def generate_image(request: ImageRequest, authorization: str = Header(None)):
         json={"prompt": prompt}
     )
 
-    # Return the image URL + prompt
     return {
         "image_url": response.json().get("image_url"),
         "prompt": prompt
