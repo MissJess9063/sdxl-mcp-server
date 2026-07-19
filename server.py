@@ -6,12 +6,27 @@ app = FastAPI()
 
 # 🔑 Replace these with your real keys
 STABILITY_API_KEY = "sk-Gyhxq4ipCuDDhCj1EiqVILp7SQ2Tgm1FnCYIbBQSCZnh70gS"
-MCP_SECRET_KEY = "sdxl_secret_key"
+MCP_SECRET_KEY = "sdxl_secret_Key"
 
-# ⭐ MCP Initialization Endpoint (GET + POST allowed)
+# ⭐ MCP Initialization Endpoint (root)
 @app.get("/initialize")
 @app.post("/initialize")
 def initialize():
+    return {
+        "protocolVersion": "2025-03-26",
+        "capabilities": {
+            "imageGeneration": True
+        },
+        "serverInfo": {
+            "name": "SDXL MCP Server",
+            "version": "1.0.0"
+        }
+    }
+
+# ⭐ MCP Initialization Endpoint (Octonous sometimes calls this path)
+@app.get("/mcp/initialize")
+@app.post("/mcp/initialize")
+def initialize_mcp():
     return {
         "protocolVersion": "2025-03-26",
         "capabilities": {
@@ -43,7 +58,6 @@ def generate_image(request: ImageRequest, authorization: str = Header(None)):
         json={"prompt": prompt}
     )
 
-    # Return the image URL + prompt
     return {
         "image_url": response.json().get("image_url"),
         "prompt": prompt
