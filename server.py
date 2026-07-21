@@ -1,3 +1,11 @@
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 import os
 import requests
 from mcp.server.fastmcp import FastMCP
@@ -17,6 +25,7 @@ mcp = FastMCP("GritDesigns", host="0.0.0.0", port=PORT)
 
 
 @mcp.tool()
+logger.info(f"Incoming headers: {dict(request.headers)}")
 def generate_image(prompt: str) -> dict:
     """Generate an image from a text prompt using Stability AI's SDXL model.
 
