@@ -13,7 +13,7 @@ PORT = int(os.environ.get("PORT", 8000))
 # FastMCP handles the full MCP protocol for you: the JSON-RPC 2.0 envelope,
 # the initialize/initialized handshake, protocol version negotiation, and
 # tools/list & tools/call dispatch. You just declare tools below.
-mcp = FastMCP("SDXL MCP Server", host="0.0.0.0", port=PORT)
+mcp = FastMCP("GritDesigns", host="0.0.0.0", port=PORT)
 
 
 @mcp.tool()
