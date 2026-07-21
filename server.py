@@ -1,14 +1,17 @@
 import logging
+import os
+
+import requests
+import uvicorn
+from mcp.server.fastmcp import Context, FastMCP
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s"
+    format="%(asctime)s [%(levelname)s] %(message)s",
 )
 logger = logging.getLogger(__name__)
-
-import os
-import requests
-from mcp.server.fastmcp import FastMCP
 
 # Read secrets from environment variables instead of hardcoding them.
 # Set these in your hosting platform's environment/config (e.g. Render's
@@ -25,7 +28,7 @@ mcp = FastMCP("GritDesigns", host="0.0.0.0", port=PORT)
 
 
 @mcp.tool()
-def generate_image(prompt: str) -> dict:
+def generate_image(ctx: Context, prompt: str) -> dict:
     """Generate an image from a text prompt using Stability AI's SDXL model.
 
     Args:
@@ -36,9 +39,16 @@ def generate_image(prompt: str) -> dict:
             "STABILITY_API_KEY is not set. Configure it as an environment "
             "variable on your hosting platform."
         )
-  
-    logger.info(f"Incoming headers: {dict(request.headers)}")
-     
+
+    # Pull the underlying HTTP request off the injected MCP Context to log
+    # the headers Octonous sent along with this specific tool call.
+    try:
+        http_request = ctx.request_context.request
+        headers = dict(http_request.headers) if http_request else {}
+        logger.info(f"generate_image called | headers={headers}")
+    except Exception as exc:
+        logger.warning(f"Could not read request headers: {exc}")
+
     response = requests.post(
         "https://api.stability.ai/v2beta/stable-image/generate/sd3",
         headers={
@@ -54,7 +64,28 @@ def generate_image(prompt: str) -> dict:
     return {"image_url": data.get("image_url"), "prompt": prompt}
 
 
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Logs every HTTP request/response hitting the MCP endpoint, including
+    the initialize handshake itself — not just tool calls — so Render's
+    logs show exactly what Octonous is sending, with clean timestamps.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        body = await request.body()
+        logger.info(
+            f"--> {request.method} {request.url.path} "
+            f"headers={dict(request.headers)} body={body[:2000]!r}"
+        )
+        response = await call_next(request)
+        logger.info(f"<-- {response.status_code} for {request.url.path}")
+        return response
+
+
 if __name__ == "__main__":
     # Streamable HTTP transport exposes a single MCP endpoint (default: /mcp)
-    # that implements the full JSON-RPC handshake Octonous expects.
-    mcp.run(transport="streamable-http")
+    # that implements the full JSON-RPC handshake Octonous expects. We wrap
+    # the underlying ASGI app with logging middleware so every request,
+    # including the handshake, shows up in Render's logs.
+    app = mcp.streamable_http_app()
+    app.add_middleware(RequestLoggingMiddleware)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)
