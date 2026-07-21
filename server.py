@@ -1,64 +1,50 @@
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel
+import os
 import requests
+from mcp.server.fastmcp import FastMCP
 
-app = FastAPI()
+# Read secrets from environment variables instead of hardcoding them.
+# Set these in your hosting platform's environment/config (e.g. Render's
+# "Environment" tab) — never commit real keys to the repo.
+STABILITY_API_KEY = os.environ.get("STABILITY_API_KEY", "")
+MCP_SECRET_KEY = os.environ.get("MCP_SECRET_KEY", "")
 
-# 🔑 Replace these with your real keys
-STABILITY_API_KEY = "sk-Gyhxq4ipCuDDhCj1EiqVILp7SQ2Tgm1FnCYIbBQSCZnh70gS"
-MCP_SECRET_KEY = "sdxl_secret_Key"
+PORT = int(os.environ.get("PORT", 8000))
 
-# ⭐ MCP Initialization Endpoint (root)
-@app.get("/initialize")
-@app.post("/initialize")
-def initialize():
-    return {
-        "protocolVersion": "2025-03-26",
-        "capabilities": {
-            "imageGeneration": True
-        },
-        "serverInfo": {
-            "name": "SDXL MCP Server",
-            "version": "1.0.0"
-        }
-    }
+# FastMCP handles the full MCP protocol for you: the JSON-RPC 2.0 envelope,
+# the initialize/initialized handshake, protocol version negotiation, and
+# tools/list & tools/call dispatch. You just declare tools below.
+mcp = FastMCP("SDXL MCP Server", host="0.0.0.0", port=PORT)
 
-# ⭐ MCP Initialization Endpoint (Octonous sometimes calls this path)
-@app.get("/mcp/initialize")
-@app.post("/mcp/initialize")
-def initialize_mcp():
-    return {
-        "protocolVersion": "2025-03-26",
-        "capabilities": {
-            "imageGeneration": True
-        },
-        "serverInfo": {
-            "name": "SDXL MCP Server",
-            "version": "1.0.0"
-        }
-    }
 
-# ⭐ JSON Model for Image Generation
-class ImageRequest(BaseModel):
-    prompt: str
+@mcp.tool()
+def generate_image(prompt: str) -> dict:
+    """Generate an image from a text prompt using Stability AI's SDXL model.
 
-# ⭐ Image Generation Endpoint
-@app.post("/mcp/generate-image")
-def generate_image(request: ImageRequest, authorization: str = Header(None)):
-    # Authorization check
-    if authorization != f"Bearer {MCP_SECRET_KEY}":
-        raise HTTPException(status_code=401, detail="Unauthorized")
+    Args:
+        prompt: The text prompt describing the image to generate.
+    """
+    if not STABILITY_API_KEY:
+        raise RuntimeError(
+            "STABILITY_API_KEY is not set. Configure it as an environment "
+            "variable on your hosting platform."
+        )
 
-    prompt = request.prompt
-
-    # Stability API request
     response = requests.post(
         "https://api.stability.ai/v2beta/stable-image/generate/sd3",
-        headers={"Authorization": f"Bearer {STABILITY_API_KEY}"},
-        json={"prompt": prompt}
+        headers={
+            "Authorization": f"Bearer {STABILITY_API_KEY}",
+            "Accept": "application/json",
+        },
+        files={"none": ""},
+        data={"prompt": prompt, "output_format": "png"},
     )
+    response.raise_for_status()
+    data = response.json()
 
-    return {
-        "image_url": response.json().get("image_url"),
-        "prompt": prompt
-    }
+    return {"image_url": data.get("image_url"), "prompt": prompt}
+
+
+if __name__ == "__main__":
+    # Streamable HTTP transport exposes a single MCP endpoint (default: /mcp)
+    # that implements the full JSON-RPC handshake Octonous expects.
+    mcp.run(transport="streamable-http")
