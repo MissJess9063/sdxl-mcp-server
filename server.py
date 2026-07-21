@@ -25,7 +25,6 @@ mcp = FastMCP("GritDesigns", host="0.0.0.0", port=PORT)
 
 
 @mcp.tool()
-logger.info(f"Incoming headers: {dict(request.headers)}")
 def generate_image(prompt: str) -> dict:
     """Generate an image from a text prompt using Stability AI's SDXL model.
 
@@ -37,7 +36,9 @@ def generate_image(prompt: str) -> dict:
             "STABILITY_API_KEY is not set. Configure it as an environment "
             "variable on your hosting platform."
         )
-
+  
+    logger.info(f"Incoming headers: {dict(request.headers)}")
+     
     response = requests.post(
         "https://api.stability.ai/v2beta/stable-image/generate/sd3",
         headers={
