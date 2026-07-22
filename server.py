@@ -1,3 +1,4 @@
+
 import logging
 import os
 
@@ -61,7 +62,15 @@ def generate_image(ctx: Context, prompt: str) -> dict:
     response.raise_for_status()
     data = response.json()
 
-    return {"image_url": data.get("image_url"), "prompt": prompt}
+    # Stability's v2beta image endpoint returns a base64-encoded PNG in the
+    # "image" field (not "image_url") when Accept: application/json is used.
+    image_b64 = data.get("image")
+    if not image_b64:
+        raise RuntimeError(
+            f"Stability API response did not include image data: {data}"
+        )
+
+    return {"image_url": f"data:image/png;base64,{image_b64}", "prompt": prompt}
 
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
